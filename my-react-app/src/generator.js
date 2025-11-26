@@ -1,46 +1,37 @@
 import React, { useState, useEffect } from "react";
 
-function RoundSystem({ started, onRoundEnd }) {
+function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts }) {
   const roundMax = 7;
-  const roundTime = [10, 9, 8, 6, 5, 3, 2]; // seconds for each round
+  const roundTime = [10, 9, 8, 6, 5, 3, 2];
   const BoxesperRound = [10, 15, 20, 25, 30, 35, 40];
-  const ShownBoxesTime = [6,5,5,4,4,3,2,2]; // seconds to show boxes
+  const ShownBoxesTime = [6, 5, 5, 4, 4, 3, 2, 2];
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(roundTime[0]);
-
   const [isRunning, setIsRunning] = useState(false);
-
-  const [countdown, setCountdown] = useState(3); // Start with countdown
+  const [countdown, setCountdown] = useState(3);
   const [showAnswers, setShowAnswers] = useState(false);
-
   const [roundStart, setRoundStart] = useState(false);
   const [roundEnd, setRoundEnd] = useState(false);
-
-
   const [rightCheck, setRightCheck] = useState("");
-
   const [leftCheck, setLeftCheck] = useState("");
+  const [amountofboxes, setamountofboxes] = useState(1);
 
-  const [setRight, setSetRight] = useState(0);
-
-  const [setLeft, setSetLeft] = useState(0);
-
-  const[ amountofboxes, setamountofboxes]= useState(1);
-
-  const functiion = ranBoxes => {
-
-
-  };
+  // Notify parent when round state changes
+  useEffect(() => {
+    if (onRoundStateChange) {
+      onRoundStateChange(roundStart && !showAnswers && countdown === null);
+    }
+  }, [roundStart, showAnswers, countdown, onRoundStateChange]);
 
   // Check if counts match
   function checkTheCount() {
-    if (setRight === amountofboxes) {
+    if (rightCount === amountofboxes) {
       setRightCheck("✅");
     } else {
       setRightCheck("❌");
     }
 
-    if (setLeft === amountofboxes) {
+    if (leftCount === amountofboxes) {
       setLeftCheck("✅");
     } else {
       setLeftCheck("❌");
@@ -53,22 +44,6 @@ function RoundSystem({ started, onRoundEnd }) {
       startInitialCountdown();
     }
   }, [started]);
-
-  // Handle keyboard input
-  useEffect(() => {
-    if (!roundStart) return;
-
-    const handleKeyDown = (event) => {
-      if (event.key === "a" || event.key === "A") {
-        setSetLeft((prev) => prev + 1);
-      } else if (event.key === "ArrowRight") {
-        setSetRight((prev) => prev + 1);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [roundStart]);
 
   // Main round timer
   useEffect(() => {
@@ -132,8 +107,7 @@ function RoundSystem({ started, onRoundEnd }) {
   const startCountdown = () => {
     let count = 3;
     setCountdown(count);
-    setSetRight(0);
-    setSetLeft(0);
+    if (onResetCounts) onResetCounts();
     setRightCheck("");
     setLeftCheck("");
 
@@ -164,25 +138,20 @@ function RoundSystem({ started, onRoundEnd }) {
       setIsRunning(false);
       if (onRoundEnd) {
         onRoundEnd();
-        setLeft(0);
-        setRight(0);
-
       }
     }
   };
 
-
- // Render the component
+  // Render the component
   return (
     <div className="round-display" style={{ padding: '20px', textAlign: 'center' }}>
       <h2>Round: {round} / {roundMax}</h2>
 
-
       {showAnswers ? (
         <div>
           <h3>✅ Showing answers...</h3>
-          <p>Left: {setLeft} {leftCheck}</p>
-          <p>Right: {setRight} {rightCheck}</p>
+          <p>Left: {leftCount} {leftCheck}</p>
+          <p>Right: {rightCount} {rightCheck}</p>
         </div>
       ) : countdown !== null ? (
         <h1 className="countdown" style={{ fontSize: '4rem', margin: '20px' }}>
@@ -191,12 +160,11 @@ function RoundSystem({ started, onRoundEnd }) {
       ) : (
         <div>
           <h3 className="Time">⏱ Time left: {timeLeft}s</h3>
-          <p>Left count: {setLeft} | Right count: {setRight}</p>
+          <p>Left count: {leftCount} | Right count: {rightCount}</p>
         </div>
       )}
     </div>
   );
 }
-
 
 export default RoundSystem;

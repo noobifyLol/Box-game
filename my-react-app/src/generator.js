@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 
-function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts }) {
+function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts, onBoxesGenerated, onScoreUpdate }) {
   const roundMax = 7;
   const roundTime = [10, 9, 8, 6, 5, 3, 2];
-  const BoxesperRound = [10, 15, 20, 25, 30, 35, 40];
-  const ShownBoxesTime = [6, 5, 5, 4, 4, 3, 2, 2];
+  const MaxBoxesperRound = [10, 15, 20, 25, 30, 35, 40];
+  const ShownBoxesTime = [6, 5, 5, 4, 4, 3, 2]; // Fixed: removed duplicate entry
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(roundTime[0]);
   const [isRunning, setIsRunning] = useState(false);
@@ -14,48 +14,134 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
   const [roundEnd, setRoundEnd] = useState(false);
   const [rightCheck, setRightCheck] = useState("");
   const [leftCheck, setLeftCheck] = useState("");
-  const [amountofboxes, setamountofboxes] = useState(1);
+  const [leftBoxCount, setLeftBoxCount] = useState(0);
+  const [rightBoxCount, setRightBoxCount] = useState(0);
+  const [showingBoxes, setShowingBoxes] = useState(false);
+  const [leftScore, setLeftScore] = useState(0);
+  const [rightScore, setRightScore] = useState(0);
+  const [boxesGenerated, setBoxesGenerated] = useState(false);
 
-  // Notify parent when round state changes
+  // Notify parent when round state changes (only during counting phase)
   useEffect(() => {
+    const isActive = isRunning && !showAnswers && countdown === null && !showingBoxes && roundStart;
     if (onRoundStateChange) {
-      onRoundStateChange(roundStart && !showAnswers && countdown === null);
+      onRoundStateChange(isActive);
     }
-  }, [roundStart, showAnswers, countdown, onRoundStateChange]);
+  }, [roundStart, showAnswers, countdown, onRoundStateChange, showingBoxes, isRunning]);
 
-  // Check if counts match
+  // Generate random boxes for the round
+  function generateBoxes(roundNumber) {
+    const maxBoxesPerSide = MaxBoxesperRound[roundNumber - 1];
+    const totalCells = 100;
+    
+    // Each side gets random number of boxes (60-100% of max)
+    const leftCount = Math.floor(Math.random() * (maxBoxesPerSide * 0.4 + 1)) + Math.floor(maxBoxesPerSide * 0.6);
+    const rightCount = Math.floor(Math.random() * (maxBoxesPerSide * 0.4 + 1)) + Math.floor(maxBoxesPerSide * 0.6);
+    
+    const totalBoxes = leftCount + rightCount;
+    
+    // Generate random positions
+    const positions = [];
+    while (positions.length < totalBoxes) {
+      const randomPos = Math.floor(Math.random() * totalCells);
+      if (!positions.includes(randomPos)) {
+        positions.push(randomPos);
+      }
+    }
+    
+    // Assign sides to positions
+    const boxes = positions.map((pos, idx) => ({
+      index: pos,
+      side: idx < leftCount ? 'left' : 'right'
+    }));
+    
+    setLeftBoxCount(leftCount);
+    setRightBoxCount(rightCount);
+    
+    return { boxes, counts: { left: leftCount, right: rightCount } };
+  }
+
+  // Check if counts match and update scores
   function checkTheCount() {
-    if (rightCount === amountofboxes) {
+    let leftCorrect = false;
+    let rightCorrect = false;
+
+    if (rightCount === rightBoxCount) {
       setRightCheck("✅");
+      rightCorrect = true;
+      setRightScore(prev => prev + 1);
     } else {
       setRightCheck("❌");
     }
 
-    if (leftCount === amountofboxes) {
+    if (leftCount === leftBoxCount) {
       setLeftCheck("✅");
+      leftCorrect = true;
+      setLeftScore(prev => prev + 1);
     } else {
       setLeftCheck("❌");
+    }
+
+    // Send scores to parent
+    if (onScoreUpdate) {
+      onScoreUpdate({
+        left: leftCorrect ? leftScore + 1 : leftScore,
+        right: rightCorrect ? rightScore + 1 : rightScore
+      });
     }
   }
 
   // Start countdown when component mounts
   useEffect(() => {
-    if (started && countdown !== null) {
+    if (started && countdown === 3 && !isRunning && round === 1) {
       startInitialCountdown();
     }
   }, [started]);
 
-  // Main round timer
+  // Show boxes at the start of each round (after GO!)
   useEffect(() => {
-    if (!isRunning || showAnswers || countdown !== null) return;
+    if (roundStart && countdown === null && !showingBoxes && !showAnswers && !boxesGenerated) {
+      console.log("Generating boxes for round", round);
+      setShowingBoxes(true);
+      setBoxesGenerated(true);
+      
+      const { boxes, counts } = generateBoxes(round);
+      
+      if (onBoxesGenerated) {
+        onBoxesGenerated(boxes, counts);
+      }
+      
+      const displayTime = ShownBoxesTime[round - 1] * 1000;
+      console.log("Boxes will hide in", displayTime / 1000, "seconds");
+      
+      const hideTimeout = setTimeout(() => {
+        console.log("Hiding boxes, starting timer");
+        if (onBoxesGenerated) {
+          onBoxesGenerated([], counts);
+        }
+        setShowingBoxes(false);
+      }, displayTime);
+      
+      return () => clearTimeout(hideTimeout);
+    }
+  }, [roundStart, countdown, showingBoxes, showAnswers, boxesGenerated, round]);
+
+  // Main round timer (only runs after boxes are hidden)
+  useEffect(() => {
+    if (!isRunning || showAnswers || countdown !== null || showingBoxes) {
+      return;
+    }
+
+    console.log("Timer running, time left:", timeLeft);
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev > 1) return prev - 1;
 
-        // Round ended
+        console.log("Round ended");
         setRoundEnd(true);
         setRoundStart(false);
+        setIsRunning(false);
         clearInterval(timer);
         checkTheCount();
         setShowAnswers(true);
@@ -64,7 +150,7 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isRunning, showAnswers, countdown, round]);
+  }, [isRunning, showAnswers, countdown, showingBoxes, timeLeft]);
 
   // Show results for n seconds
   useEffect(() => {
@@ -72,6 +158,8 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
 
     const timeout = setTimeout(() => {
       setShowAnswers(false);
+      setBoxesGenerated(false); // Reset for next round
+      
       if (round < roundMax) {
         startCountdown();
       } else {
@@ -81,7 +169,7 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     }, 3500);
 
     return () => clearTimeout(timeout);
-  }, [showAnswers, round]);
+  }, [showAnswers]);
 
   // Initial countdown at start
   const startInitialCountdown = () => {
@@ -105,6 +193,7 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
 
   // Countdown between rounds
   const startCountdown = () => {
+    setRoundStart(false);
     let count = 3;
     setCountdown(count);
     if (onResetCounts) onResetCounts();
@@ -117,8 +206,6 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
         setCountdown(count);
       } else if (count === 0) {
         setCountdown("GO!");
-        setRoundStart(true);
-        setRoundEnd(false);
       } else {
         clearInterval(interval);
         setCountdown(null);
@@ -133,6 +220,8 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
       const next = round + 1;
       setRound(next);
       setTimeLeft(roundTime[next - 1]);
+      setRoundStart(true);
+      setRoundEnd(false);
       setIsRunning(true);
     } else {
       setIsRunning(false);
@@ -142,25 +231,34 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     }
   };
 
-  // Render the component
   return (
     <div className="round-display" style={{ padding: '20px', textAlign: 'center' }}>
       <h2>Round: {round} / {roundMax}</h2>
+      <div style={{ fontSize: '1.5rem', margin: '10px 0' }}>
+        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>Left: {leftScore}</span>
+        {' | '}
+        <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>Right: {rightScore}</span>
+      </div>
 
       {showAnswers ? (
         <div>
-          <h3>✅ Showing answers...</h3>
-          <p>Left: {leftCount} {leftCheck}</p>
-          <p>Right: {rightCount} {rightCheck}</p>
+          <h3>✅ Round Results</h3>
+          <p>Left: {leftCount} {leftCheck} (Correct: {leftBoxCount})</p>
+          <p>Right: {rightCount} {rightCheck} (Correct: {rightBoxCount})</p>
         </div>
       ) : countdown !== null ? (
         <h1 className="countdown" style={{ fontSize: '4rem', margin: '20px' }}>
           {countdown}
         </h1>
+      ) : showingBoxes ? (
+        <div>
+          <h3 style={{ fontSize: '2rem', margin: '20px' }}>👀 Memorize the boxes!</h3>
+          <p style={{ fontSize: '1.2rem' }}>Blue (Left): {leftBoxCount} | Red (Right): {rightBoxCount}</p>
+        </div>
       ) : (
         <div>
-          <h3 className="Time">⏱ Time left: {timeLeft}s</h3>
-          <p>Left count: {leftCount} | Right count: {rightCount}</p>
+          <h3 className="Time" style={{ fontSize: '2rem', color: '#e74c3c' }}>⏱ Time left: {timeLeft}s</h3>
+          <p style={{ fontSize: '1.2rem' }}>Left count: {leftCount} | Right count: {rightCount}</p>
         </div>
       )}
     </div>

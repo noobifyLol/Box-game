@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 // ============= GENERATOR.JS (RoundSystem Component) =============
 export default function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts, onBoxesGenerated, onScoreUpdate }) {
   const roundMax = 7;
-  const roundTime = [15, 10, 9, 9, 9, 8, 7];
-  const MaxBoxesperRound = [10, 15, 20, 25, 30, 35, 40];
+  const roundTime = [5, 9, 9, 10, 10, 9, 8];
+  const MaxBoxesperRound = [10, 15, 20, 25, 30, 40, 50];
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(roundTime[0]);
   const [isRunning, setIsRunning] = useState(false);
@@ -76,31 +76,22 @@ export default function RoundSystem({ started, onRoundEnd, onRoundStateChange, l
     const currentLeftCount = leftCountRef.current;
     const currentRightCount = rightCountRef.current;
 
-    console.log("=== CHECKING COUNTS ===");
-    console.log("Left - User Count:", currentLeftCount, "| Correct:", leftBoxCount);
-    console.log("Right - User Count:", currentRightCount, "| Correct:", rightBoxCount);
 
     if (currentRightCount === rightBoxCount) {
-      console.log("Right is CORRECT! ✅");
       setRightCheck("✅");
       newRightScore = rightScore + 1;
       setRightScore(newRightScore);
     } else {
-      console.log("Right is WRONG! ❌");
       setRightCheck("❌");
     }
 
     if (currentLeftCount === leftBoxCount) {
-      console.log("Left is CORRECT! ✅");
       setLeftCheck("✅");
       newLeftScore = leftScore + 1;
       setLeftScore(newLeftScore);
     } else {
-      console.log("Left is WRONG! ❌");
       setLeftCheck("❌");
     }
-
-    console.log("New Scores - Left:", newLeftScore, "Right:", newRightScore);
 
     // Send updated scores to parent immediately
     if (onScoreUpdate) {

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 
-// ============= GENERATOR.JS (RoundSystem Component) =============
+// ============= GENERATOR.JS (RoundSystem Component) ============= This makes the portion of the game that handles rounds, timers, box generation, and scoring.
 export default function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts, onBoxesGenerated, onScoreUpdate }) {
   const roundMax = 7;
   const roundTime = [5, 9, 9, 10, 10, 9, 8];
-  const MaxBoxesperRound = [10, 15, 20, 25, 30, 40, 50];
+  const MaxBoxesperRound = [12, 16, 22, 25, 30, 38, 47];
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(roundTime[0]);
   const [isRunning, setIsRunning] = useState(false);

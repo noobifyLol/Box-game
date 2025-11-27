@@ -1,4 +1,4 @@
-// ============= APP.JS (Main Component) =============
+// ============= APP.JS (Main Component) ============= This is the main component that manages the overall game state, user interface, and interactions.
 
 import React, { useState, useEffect, useRef } from "react";
 import RoundSystem from "./generator";
@@ -40,17 +40,17 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [roundActive]);
-
+ // Determine winner at game end
   const getWinner = () => {
     if (finalScores.left > finalScores.right) {
-      return { winner: "Left Player", color: "#4a90e2", emoji: "🎉" };
+      return { winner: "Left Player", color: "#fd9a04ff", emoji: "🎉" };
     } else if (finalScores.right > finalScores.left) {
-      return { winner: "Right Player", color: "#e74c3c", emoji: "🎉" };
+      return { winner: "Right Player", color: "#48ff00ff", emoji: "🎉" };
     } else {
       return { winner: "It's a Draw!", color: "#a322caff", emoji: "🤝" };
     }
   };
-
+// Rerendering the game 
   if (showMenu) {
     return (
       <div className={`menu ${fading ? 'fade-out' : ''}`}>

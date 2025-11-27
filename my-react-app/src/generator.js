@@ -1,47 +1,54 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
-function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts, onBoxesGenerated, onScoreUpdate }) {
+// ============= GENERATOR.JS (RoundSystem Component) =============
+export default function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, rightCount, onResetCounts, onBoxesGenerated, onScoreUpdate }) {
   const roundMax = 7;
-  const roundTime = [10, 9, 8, 6, 5, 3, 2];
+  const roundTime = [15, 10, 9, 9, 9, 8, 7];
   const MaxBoxesperRound = [10, 15, 20, 25, 30, 35, 40];
-  const ShownBoxesTime = [6, 5, 5, 4, 4, 3, 2]; // Fixed: removed duplicate entry
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(roundTime[0]);
   const [isRunning, setIsRunning] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [showAnswers, setShowAnswers] = useState(false);
   const [roundStart, setRoundStart] = useState(false);
-  const [roundEnd, setRoundEnd] = useState(false);
   const [rightCheck, setRightCheck] = useState("");
   const [leftCheck, setLeftCheck] = useState("");
   const [leftBoxCount, setLeftBoxCount] = useState(0);
   const [rightBoxCount, setRightBoxCount] = useState(0);
-  const [showingBoxes, setShowingBoxes] = useState(false);
   const [leftScore, setLeftScore] = useState(0);
   const [rightScore, setRightScore] = useState(0);
-  const [boxesGenerated, setBoxesGenerated] = useState(false);
+  const [boxesShown, setBoxesShown] = useState(false);
+  
+  const timerRef = useRef(null);
+  const countdownRef = useRef(null);
+  const leftCountRef = useRef(leftCount);
+  const rightCountRef = useRef(rightCount);
 
-  // Notify parent when round state changes (only during counting phase)
+  // Update refs when counts change
   useEffect(() => {
-    const isActive = isRunning && !showAnswers && countdown === null && !showingBoxes && roundStart;
+    leftCountRef.current = leftCount;
+    rightCountRef.current = rightCount;
+  }, [leftCount, rightCount]);
+
+  // Notify parent when round is active
+  useEffect(() => {
+    const isActive = roundStart && !showAnswers && countdown === null && boxesShown;
     if (onRoundStateChange) {
       onRoundStateChange(isActive);
     }
-  }, [roundStart, showAnswers, countdown, onRoundStateChange, showingBoxes, isRunning]);
+  }, [roundStart, showAnswers, countdown, boxesShown, onRoundStateChange]);
 
-  // Generate random boxes for the round
+  // Generate random boxes
   function generateBoxes(roundNumber) {
     const maxBoxesPerSide = MaxBoxesperRound[roundNumber - 1];
     const totalCells = 100;
     
-    // Each side gets random number of boxes (60-100% of max)
     const leftCount = Math.floor(Math.random() * (maxBoxesPerSide * 0.4 + 1)) + Math.floor(maxBoxesPerSide * 0.6);
     const rightCount = Math.floor(Math.random() * (maxBoxesPerSide * 0.4 + 1)) + Math.floor(maxBoxesPerSide * 0.6);
     
     const totalBoxes = leftCount + rightCount;
-    
-    // Generate random positions
     const positions = [];
+    
     while (positions.length < totalBoxes) {
       const randomPos = Math.floor(Math.random() * totalCells);
       if (!positions.includes(randomPos)) {
@@ -49,7 +56,6 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
       }
     }
     
-    // Assign sides to positions
     const boxes = positions.map((pos, idx) => ({
       index: pos,
       side: idx < leftCount ? 'left' : 'right'
@@ -61,104 +67,111 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     return { boxes, counts: { left: leftCount, right: rightCount } };
   }
 
-  // Check if counts match and update scores
+  // Check counts and update scores
   function checkTheCount() {
-    let leftCorrect = false;
-    let rightCorrect = false;
+    let newLeftScore = leftScore;
+    let newRightScore = rightScore;
 
-    if (rightCount === rightBoxCount) {
+    // Use refs to get the most current count values
+    const currentLeftCount = leftCountRef.current;
+    const currentRightCount = rightCountRef.current;
+
+    console.log("=== CHECKING COUNTS ===");
+    console.log("Left - User Count:", currentLeftCount, "| Correct:", leftBoxCount);
+    console.log("Right - User Count:", currentRightCount, "| Correct:", rightBoxCount);
+
+    if (currentRightCount === rightBoxCount) {
+      console.log("Right is CORRECT! ✅");
       setRightCheck("✅");
-      rightCorrect = true;
-      setRightScore(prev => prev + 1);
+      newRightScore = rightScore + 1;
+      setRightScore(newRightScore);
     } else {
+      console.log("Right is WRONG! ❌");
       setRightCheck("❌");
     }
 
-    if (leftCount === leftBoxCount) {
+    if (currentLeftCount === leftBoxCount) {
+      console.log("Left is CORRECT! ✅");
       setLeftCheck("✅");
-      leftCorrect = true;
-      setLeftScore(prev => prev + 1);
+      newLeftScore = leftScore + 1;
+      setLeftScore(newLeftScore);
     } else {
+      console.log("Left is WRONG! ❌");
       setLeftCheck("❌");
     }
 
-    // Send scores to parent
+    console.log("New Scores - Left:", newLeftScore, "Right:", newRightScore);
+
+    // Send updated scores to parent immediately
     if (onScoreUpdate) {
       onScoreUpdate({
-        left: leftCorrect ? leftScore + 1 : leftScore,
-        right: rightCorrect ? rightScore + 1 : rightScore
+        left: newLeftScore,
+        right: newRightScore
       });
     }
   }
 
-  // Start countdown when component mounts
+  // Start initial countdown
   useEffect(() => {
     if (started && countdown === 3 && !isRunning && round === 1) {
       startInitialCountdown();
     }
   }, [started]);
 
-  // Show boxes at the start of each round (after GO!)
+  // Show boxes when round starts
   useEffect(() => {
-    if (roundStart && countdown === null && !showingBoxes && !showAnswers && !boxesGenerated) {
-      console.log("Generating boxes for round", round);
-      setShowingBoxes(true);
-      setBoxesGenerated(true);
-      
+    if (roundStart && countdown === null && !boxesShown && !showAnswers) {
       const { boxes, counts } = generateBoxes(round);
       
       if (onBoxesGenerated) {
         onBoxesGenerated(boxes, counts);
       }
       
-      const displayTime = ShownBoxesTime[round - 1] * 1000;
-      console.log("Boxes will hide in", displayTime / 1000, "seconds");
-      
-      const hideTimeout = setTimeout(() => {
-        console.log("Hiding boxes, starting timer");
-        if (onBoxesGenerated) {
-          onBoxesGenerated([], counts);
-        }
-        setShowingBoxes(false);
-      }, displayTime);
-      
-      return () => clearTimeout(hideTimeout);
+      setBoxesShown(true);
     }
-  }, [roundStart, countdown, showingBoxes, showAnswers, boxesGenerated, round]);
+  }, [roundStart, countdown, boxesShown, showAnswers]);
 
-  // Main round timer (only runs after boxes are hidden)
+  // Main timer
   useEffect(() => {
-    if (!isRunning || showAnswers || countdown !== null || showingBoxes) {
+    if (!isRunning || showAnswers || countdown !== null || !boxesShown) {
       return;
     }
 
-    console.log("Timer running, time left:", timeLeft);
-
-    const timer = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev > 1) return prev - 1;
 
-        console.log("Round ended");
-        setRoundEnd(true);
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        
         setRoundStart(false);
         setIsRunning(false);
-        clearInterval(timer);
-        checkTheCount();
+        
+        // Use setTimeout to ensure counts are captured at the right time
+        setTimeout(() => {
+          checkTheCount();
+        }, 100);
+        
         setShowAnswers(true);
         return 0;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isRunning, showAnswers, countdown, showingBoxes, timeLeft]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isRunning, showAnswers, countdown, boxesShown]);
 
-  // Show results for n seconds
+  // Show results
   useEffect(() => {
     if (!showAnswers) return;
 
     const timeout = setTimeout(() => {
       setShowAnswers(false);
-      setBoxesGenerated(false); // Reset for next round
+      setBoxesShown(false);
       
       if (round < roundMax) {
         startCountdown();
@@ -171,19 +184,19 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     return () => clearTimeout(timeout);
   }, [showAnswers]);
 
-  // Initial countdown at start
   const startInitialCountdown = () => {
     let count = 3;
     setCountdown(count);
 
-    const interval = setInterval(() => {
+    countdownRef.current = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
       } else if (count === 0) {
         setCountdown("GO!");
       } else {
-        clearInterval(interval);
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
         setCountdown(null);
         setRoundStart(true);
         setIsRunning(true);
@@ -191,7 +204,6 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     }, 1000);
   };
 
-  // Countdown between rounds
   const startCountdown = () => {
     setRoundStart(false);
     let count = 3;
@@ -200,28 +212,27 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     setRightCheck("");
     setLeftCheck("");
 
-    const interval = setInterval(() => {
+    countdownRef.current = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
       } else if (count === 0) {
         setCountdown("GO!");
       } else {
-        clearInterval(interval);
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
         setCountdown(null);
         nextRound();
       }
     }, 1000);
   };
 
-  // Initiate the next round
   const nextRound = () => {
     if (round < roundMax) {
       const next = round + 1;
       setRound(next);
       setTimeLeft(roundTime[next - 1]);
       setRoundStart(true);
-      setRoundEnd(false);
       setIsRunning(true);
     } else {
       setIsRunning(false);
@@ -231,8 +242,15 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
   return (
-    <div className="round-display" style={{ padding: '20px', textAlign: 'center' }}>
+    <div style={{ padding: '20px', textAlign: 'center' }}>
       <h2>Round: {round} / {roundMax}</h2>
       <div style={{ fontSize: '1.5rem', margin: '10px 0' }}>
         <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>Left: {leftScore}</span>
@@ -247,22 +265,15 @@ function RoundSystem({ started, onRoundEnd, onRoundStateChange, leftCount, right
           <p>Right: {rightCount} {rightCheck} (Correct: {rightBoxCount})</p>
         </div>
       ) : countdown !== null ? (
-        <h1 className="countdown" style={{ fontSize: '4rem', margin: '20px' }}>
+        <h1 style={{ fontSize: '4rem', margin: '20px' }}>
           {countdown}
         </h1>
-      ) : showingBoxes ? (
-        <div>
-          <h3 style={{ fontSize: '2rem', margin: '20px' }}>👀 Memorize the boxes!</h3>
-          <p style={{ fontSize: '1.2rem' }}>Blue (Left): {leftBoxCount} | Red (Right): {rightBoxCount}</p>
-        </div>
       ) : (
         <div>
-          <h3 className="Time" style={{ fontSize: '2rem', color: '#e74c3c' }}>⏱ Time left: {timeLeft}s</h3>
-          <p style={{ fontSize: '1.2rem' }}>Left count: {leftCount} | Right count: {rightCount}</p>
+          <h3 style={{ fontSize: '2rem', color: '#e74c3c' }}>⏱ Time left: {timeLeft}s</h3>
+          <p style={{ fontSize: '1.2rem' }}>Left: {leftCount} | Right: {rightCount}</p>
         </div>
       )}
     </div>
   );
 }
-
-export default RoundSystem;

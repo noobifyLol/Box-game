@@ -1,9 +1,8 @@
-// App.js
-import React, { useState, useEffect } from "react";
-import "./App.css";
-import LeftHandImg from "./pictures/Left.png";
-import RightHandImg from "./pictures/right.png";
+// ============= APP.JS (Main Component) =============
+
+import React, { useState, useEffect, useRef } from "react";
 import RoundSystem from "./generator";
+import styles from "./App.css";
 
 function App() {
   const [fading, setFading] = useState(false);
@@ -14,10 +13,8 @@ function App() {
   const [roundEnded, setRoundEnded] = useState(false);
   const [roundActive, setRoundActive] = useState(false);
   const [activeBoxes, setActiveBoxes] = useState([]);
-  const [boxCounts, setBoxCounts] = useState({ left: 0, right: 0 });
   const [finalScores, setFinalScores] = useState({ left: 0, right: 0 });
 
-  // Handle fading transition when Start is clicked
   const handleStartClick = () => {
     setFading(true);
     setTimeout(() => {
@@ -26,10 +23,13 @@ function App() {
     }, 500);
   };
 
-  // Keyboard input only works when round is active
+  // Keyboard input ONLY when round is active
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (!roundActive) return;
+      if (!roundActive) {
+        return;
+      }
+      
       if (event.key === "a" || event.key === "A") {
         setLeft((prev) => prev + 1);
       } else if (event.key === "ArrowRight") {
@@ -41,14 +41,13 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [roundActive]);
 
-  // Determine winner
   const getWinner = () => {
     if (finalScores.left > finalScores.right) {
       return { winner: "Left Player", color: "#4a90e2", emoji: "🎉" };
     } else if (finalScores.right > finalScores.left) {
       return { winner: "Right Player", color: "#e74c3c", emoji: "🎉" };
     } else {
-      return { winner: "It's a Draw!", color: "#f39c12", emoji: "🤝" };
+      return { winner: "It's a Draw!", color: "#a322caff", emoji: "🤝" };
     }
   };
 
@@ -64,7 +63,6 @@ function App() {
     );
   }
 
-  // Draws the grid of boxes
   const rows = 10;
   const cols = 10;
   const cells = Array.from({ length: rows * cols }, (_, i) => {
@@ -76,7 +74,6 @@ function App() {
     );
   });
 
-  // Main App render
   return (
     <div className="wrapper">
       <div className="top-bar">
@@ -91,9 +88,8 @@ function App() {
               setLeft(0);
               setRight(0);
             }}
-            onBoxesGenerated={(boxes, counts) => {
+            onBoxesGenerated={(boxes) => {
               setActiveBoxes(boxes);
-              setBoxCounts(counts);
             }}
             onScoreUpdate={(scores) => {
               setFinalScores(scores);
@@ -102,8 +98,8 @@ function App() {
         )}
       </div>
       
-      {!started && (
-        <div className={`welcome ${started ? 'fade-out' : ''}`}>
+      {!started && !roundEnded && (
+        <div className="welcome">
           <h2>Press "A" or "→" to count the boxes!</h2>
         </div>
       )}
@@ -134,7 +130,7 @@ function App() {
         <div className="middle">
           <div className="LHand">
             <p className="counter">{leftCount}</p>
-            <img src={LeftHandImg} alt="Left Controller" />
+            <div style={{width: '100px', height: '100px', background: '#4a90e2', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', color: 'white', fontWeight: 'bold'}}>Left</div>
             <h3>Press "A"</h3>
           </div>
 
@@ -142,7 +138,7 @@ function App() {
 
           <div className="RHand">
             <p className="counter">{rightCount}</p>
-            <img src={RightHandImg} alt="Right Controller" />
+            <div style={{width: '100px', height: '100px', background: '#e74c3c', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', color: 'white', fontWeight: 'bold'}}>Right</div>
             <h3>Press →</h3>
           </div>
         </div>
@@ -155,7 +151,7 @@ function App() {
           </button>
         ) : null}
       </div>
-    </div>
+       </div>
   );
 }
 

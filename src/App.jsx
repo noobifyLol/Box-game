@@ -40,6 +40,28 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [roundActive]);
+  
+  // Decrement functionality
+    useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (!roundActive) {
+        return;
+      }
+      
+      if (event.key === "s" || event.key === "S") {
+        setLeft(prev => Math.max(0, prev - 1));
+      }
+      if (event.key === "ArrowLeft") {
+        setRight(prev => Math.max(0, prev - 1));
+      }
+
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [roundActive]);
+
+
  // Determine winner at game end
   const getWinner = () => {
     if (finalScores.left > finalScores.right) {
@@ -101,6 +123,7 @@ function App() {
       {!started && !roundEnded && (
         <div className="welcome">
           <h2>Press "A" or "→" to count the boxes!</h2>
+          <h3> Press "S" or "←" to decrement the count!</h3>
         </div>
       )}
 

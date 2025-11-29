@@ -247,6 +247,7 @@ export default function RoundSystem({ started, onRoundEnd, onRoundStateChange, l
         <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>Left: {leftScore}</span>
         {' | '}
         <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>Right: {rightScore}</span>
+        <h1 style = {{color : 'green', fontSize : 24 }}> Press "S" for left player and "←" for the right player to decrement the count!</h1>
       </div>
 
       {showAnswers ? (

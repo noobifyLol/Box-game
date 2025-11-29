@@ -1,8 +1,6 @@
-// ============= APP.JS (Main Component) ============= This is the main component that manages the overall game state, user interface, and interactions.
-
 import React, { useState, useEffect, useRef } from "react";
 import RoundSystem from "./generator";
-import styles from "./App.css";
+import "./App.css";
 
 function App() {
   const [fading, setFading] = useState(false);
@@ -14,55 +12,181 @@ function App() {
   const [roundActive, setRoundActive] = useState(false);
   const [activeBoxes, setActiveBoxes] = useState([]);
   const [finalScores, setFinalScores] = useState({ left: 0, right: 0 });
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  
+  // Create audio pools for different sounds
+  const clickSoundPool = useRef([]);
+  const decrementSoundPool = useRef([]);
+  const currentClickIndex = useRef(0);
+  const currentDecrementIndex = useRef(0);
+  const startSound = useRef(null);
+  const winSound = useRef(null);
+
+  // Initialize audio pools on mount with preloading
+  useEffect(() => {
+    const loadAudio = async () => {
+      // Create increment sound pool with preloading
+      clickSoundPool.current = await Promise.all(
+        Array.from({ length: 15 }, async () => {
+          const audio = new Audio('/Audio/ButtonClick.ogg');
+          audio.preload = 'auto';
+          audio.volume = 0.5;
+          // Force load
+          try {
+            await audio.load();
+          } catch (e) {
+            console.log('Preload click sound:', e);
+          }
+          return audio;
+        })
+      );
+
+      // Create decrement sound pool with preloading
+      decrementSoundPool.current = await Promise.all(
+        Array.from({ length: 15 }, async () => {
+          const audio = new Audio('/Audio/D.ogg');
+          audio.preload = 'auto';
+          audio.volume = 0.3;
+          try {
+            await audio.load();
+          } catch (e) {
+            console.log('Preload decrement sound:', e);
+          }
+          return audio;
+        })
+      );
+
+      // Initialize start sound
+      startSound.current = new Audio('/Audio/game.ogg');
+      startSound.current.preload = 'auto';
+      startSound.current.volume = 0.7;
+      try {
+        await startSound.current.load();
+      } catch (e) {
+        console.log('Preload start sound:', e);
+      }
+
+      // Initialize win sound
+      winSound.current = new Audio('/Audio/win.ogg');
+      winSound.current.preload = 'auto';
+      winSound.current.volume = 0.8;
+      try {
+        await winSound.current.load();
+      } catch (e) {
+      }
+
+      setAudioLoaded(true);
+    };
+
+    loadAudio();
+  }, []);
+
+  // Play when game ends
+  useEffect(() => {
+    if (roundEnded && winSound.current && audioLoaded) {
+      // Use cloneNode for instant playback
+      const clone = winSound.current.cloneNode();
+      clone.volume = 0.8;
+      clone.play().catch(e => console.log('Win sound failed:', e));
+    }
+  }, [roundEnded, audioLoaded]);
+
+  // Optimized increment sound - uses cloneNode for zero latency
+  const playClickSound = () => {
+    if (!audioLoaded || clickSoundPool.current.length === 0) return;
+    
+    const audio = clickSoundPool.current[currentClickIndex.current];
+    
+    // Clone the audio node for instant playback without resetting
+    const clone = audio.cloneNode();
+    clone.volume = 0.5;
+    clone.play().catch(e => console.log('Audio play failed:', e));
+    
+    currentClickIndex.current = (currentClickIndex.current + 1) % clickSoundPool.current.length;
+  };
+
+  // Optimized decrement sound - uses cloneNode for zero latency
+  const playDecrementSound = () => {
+    if (!audioLoaded || decrementSoundPool.current.length === 0) return;
+    
+    const audio = decrementSoundPool.current[currentDecrementIndex.current];
+    
+    // Clone the audio node for instant playback
+    const clone = audio.cloneNode();
+    clone.volume = 0.5;
+    clone.play().catch(e => console.log('Decrement audio failed:', e));
+    
+    currentDecrementIndex.current = (currentDecrementIndex.current + 1) % decrementSoundPool.current.length;
+  };
 
   const handleStartClick = () => {
     setFading(true);
+    
+    // Play start sound immediately
+    if (startSound.current && audioLoaded) {
+      const clone = startSound.current.cloneNode();
+      clone.volume = 0.7;
+      clone.play().catch(e => console.log('Start sound failed:', e));
+    }
+    
     setTimeout(() => {
       setShowMenu(false);
       setFading(false);
     }, 500);
   };
 
-  // Keyboard input ONLY when round is active
+  // Keyboard input for INCREMENT - ONLY when round is active
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (!roundActive) {
-        return;
-      }
+      if (!roundActive) return;
       
       if (event.key === "a" || event.key === "A") {
+        playClickSound(); // Play sound BEFORE state update
         setLeft((prev) => prev + 1);
       } else if (event.key === "ArrowRight") {
+        playClickSound(); // Play sound BEFORE state update
         setRight((prev) => prev + 1);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [roundActive]);
+  }, [roundActive, audioLoaded]);
   
-  // Decrement functionality
-    useEffect(() => {
+
+
+  // Keyboard input for DECREMENT - ONLY when round is active
+  useEffect(() => {
     const handleKeyDown = (event) => {
-      if (!roundActive) {
-        return;
-      }
+      if (!roundActive) return;
       
       if (event.key === "s" || event.key === "S") {
-        setLeft(prev => Math.max(0, prev - 1));
+        setLeft(prev => {
+          if (prev > 0) {
+            playDecrementSound(); // Play sound immediately
+            return prev - 1;
+          }
+          return prev;
+        });
       }
       if (event.key === "ArrowLeft") {
-        setRight(prev => Math.max(0, prev - 1));
+        setRight(prev => {
+          if (prev > 0) {
+            playDecrementSound(); // Play sound immediately
+            return prev - 1;
+          }
+          return prev;
+        });
       }
-
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [roundActive]);
+  }, [roundActive, audioLoaded]);
 
 
- // Determine winner at game end
+
+  // Determine winner at game end
   const getWinner = () => {
     if (finalScores.left > finalScores.right) {
       return { winner: "Left Player", color: "#fd9a04ff", emoji: "🎉" };
@@ -72,13 +196,15 @@ function App() {
       return { winner: "It's a Draw!", color: "#a322caff", emoji: "🤝" };
     }
   };
-// Rerendering the game 
+
+  // Menu screen
   if (showMenu) {
     return (
       <div className={`menu ${fading ? 'fade-out' : ''}`}>
         <h1>Welcome to Box Game</h1>
         <p>Click Start to begin the game.</p>
-        <button className="Start" onClick={handleStartClick}>
+        {!audioLoaded && <p style={{fontSize: '0.9rem', opacity: 0.7}}>Loading audio...</p>}
+        <button className="Start" onClick={handleStartClick} disabled={!audioLoaded}>
           Start
         </button>
       </div>
@@ -95,6 +221,8 @@ function App() {
       <div key={i} className={cellClass}></div>
     );
   });
+
+
 
   return (
     <div className="wrapper">
@@ -123,7 +251,7 @@ function App() {
       {!started && !roundEnded && (
         <div className="welcome">
           <h2>Press "A" or "→" to count the boxes!</h2>
-          <h3> Press "S" or "←" to decrement the count!</h3>
+          <h3>Press "S" or "←" to decrement the count!</h3>
         </div>
       )}
 
@@ -168,13 +296,13 @@ function App() {
       )}
 
       <div className="hands">
-        {!started ? (
+        {!started && (
           <button className="Start" onClick={() => setStarted(true)}>
             Start Counting
           </button>
-        ) : null}
+        )}
       </div>
-       </div>
+    </div>
   );
 }
 

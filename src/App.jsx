@@ -115,7 +115,7 @@ function App() {
     
     const audio = decrementSoundPool.current[currentDecrementIndex.current];
     const clone = audio.cloneNode();
-    clone.volume = 0.5;
+    clone.volume = 0.3;
     clone.play().catch(e => console.log('Decrement audio failed:', e));
     
     currentDecrementIndex.current = (currentDecrementIndex.current + 1) % decrementSoundPool.current.length;
@@ -149,13 +149,14 @@ function App() {
     setRight((prev) => prev + 1);
   };
 
-  // Keyboard input for desktop
+  // Keyboard input for INCREMENT and DECREMENT - Desktop only
   useEffect(() => {
     if (isMobile) return; // Skip keyboard on mobile
     
     const handleKeyDown = (event) => {
       if (!roundActive) return;
       
+      // INCREMENT keys
       if (event.key === "a" || event.key === "A") {
         playClickSound();
         setLeft((prev) => prev + 1);
@@ -163,20 +164,8 @@ function App() {
         playClickSound();
         setRight((prev) => prev + 1);
       }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [roundActive, audioLoaded, isMobile]);
-
-  // Decrement for desktop only
-  useEffect(() => {
-    if (isMobile) return;
-    
-    const handleKeyDown = (event) => {
-      if (!roundActive) return;
-      
-      if (event.key === "s" || event.key === "S") {
+      // DECREMENT keys
+      else if (event.key === "s" || event.key === "S") {
         setLeft(prev => {
           if (prev > 0) {
             playDecrementSound();
@@ -184,8 +173,7 @@ function App() {
           }
           return prev;
         });
-      }
-      if (event.key === "ArrowLeft") {
+      } else if (event.key === "ArrowLeft") {
         setRight(prev => {
           if (prev > 0) {
             playDecrementSound();

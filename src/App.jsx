@@ -13,6 +13,7 @@ function App() {
   const [activeBoxes, setActiveBoxes] = useState([]);
   const [finalScores, setFinalScores] = useState({ left: 0, right: 0 });
   const [audioLoaded, setAudioLoaded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Create audio pools for different sounds
   const clickSoundPool = useRef([]);
@@ -22,16 +23,26 @@ function App() {
   const startSound = useRef(null);
   const winSound = useRef(null);
 
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Initialize audio pools on mount with preloading
   useEffect(() => {
     const loadAudio = async () => {
-      // Create increment sound pool with preloading
       clickSoundPool.current = await Promise.all(
         Array.from({ length: 15 }, async () => {
           const audio = new Audio('/Audio/ButtonClick.ogg');
           audio.preload = 'auto';
           audio.volume = 0.5;
-          // Force load
           try {
             await audio.load();
           } catch (e) {
@@ -41,7 +52,6 @@ function App() {
         })
       );
 
-      // Create decrement sound pool with preloading
       decrementSoundPool.current = await Promise.all(
         Array.from({ length: 15 }, async () => {
           const audio = new Audio('/Audio/D.ogg');
@@ -56,7 +66,6 @@ function App() {
         })
       );
 
-      // Initialize start sound
       startSound.current = new Audio('/Audio/game.ogg');
       startSound.current.preload = 'auto';
       startSound.current.volume = 0.7;
@@ -66,14 +75,12 @@ function App() {
         console.log('Preload start sound:', e);
       }
 
-      // Initialize win sound
       winSound.current = new Audio('/Audio/win.ogg');
       winSound.current.preload = 'auto';
       winSound.current.volume = 0.8;
       try {
         await winSound.current.load();
-      } catch (e) {
-      }
+      } catch (e) {}
 
       setAudioLoaded(true);
     };
@@ -84,20 +91,17 @@ function App() {
   // Play when game ends
   useEffect(() => {
     if (roundEnded && winSound.current && audioLoaded) {
-      // Use cloneNode for instant playback
       const clone = winSound.current.cloneNode();
       clone.volume = 0.8;
       clone.play().catch(e => console.log('Win sound failed:', e));
     }
   }, [roundEnded, audioLoaded]);
 
-  // Optimized increment sound - uses cloneNode for zero latency
+  // Optimized increment sound
   const playClickSound = () => {
     if (!audioLoaded || clickSoundPool.current.length === 0) return;
     
     const audio = clickSoundPool.current[currentClickIndex.current];
-    
-    // Clone the audio node for instant playback without resetting
     const clone = audio.cloneNode();
     clone.volume = 0.5;
     clone.play().catch(e => console.log('Audio play failed:', e));
@@ -105,13 +109,11 @@ function App() {
     currentClickIndex.current = (currentClickIndex.current + 1) % clickSoundPool.current.length;
   };
 
-  // Optimized decrement sound - uses cloneNode for zero latency
+  // Optimized decrement sound
   const playDecrementSound = () => {
     if (!audioLoaded || decrementSoundPool.current.length === 0) return;
     
     const audio = decrementSoundPool.current[currentDecrementIndex.current];
-    
-    // Clone the audio node for instant playback
     const clone = audio.cloneNode();
     clone.volume = 0.5;
     clone.play().catch(e => console.log('Decrement audio failed:', e));
@@ -122,7 +124,6 @@ function App() {
   const handleStartClick = () => {
     setFading(true);
     
-    // Play start sound immediately
     if (startSound.current && audioLoaded) {
       const clone = startSound.current.cloneNode();
       clone.volume = 0.7;
@@ -135,35 +136,50 @@ function App() {
     }, 500);
   };
 
-  // Keyboard input for INCREMENT - ONLY when round is active
+  // Handle button clicks (mobile)
+  const handleLeftIncrement = () => {
+    if (!roundActive) return;
+    playClickSound();
+    setLeft((prev) => prev + 1);
+  };
+
+  const handleRightIncrement = () => {
+    if (!roundActive) return;
+    playClickSound();
+    setRight((prev) => prev + 1);
+  };
+
+  // Keyboard input for desktop
   useEffect(() => {
+    if (isMobile) return; // Skip keyboard on mobile
+    
     const handleKeyDown = (event) => {
       if (!roundActive) return;
       
       if (event.key === "a" || event.key === "A") {
-        playClickSound(); // Play sound BEFORE state update
+        playClickSound();
         setLeft((prev) => prev + 1);
       } else if (event.key === "ArrowRight") {
-        playClickSound(); // Play sound BEFORE state update
+        playClickSound();
         setRight((prev) => prev + 1);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [roundActive, audioLoaded]);
-  
+  }, [roundActive, audioLoaded, isMobile]);
 
-
-  // Keyboard input for DECREMENT - ONLY when round is active
+  // Decrement for desktop only
   useEffect(() => {
+    if (isMobile) return;
+    
     const handleKeyDown = (event) => {
       if (!roundActive) return;
       
       if (event.key === "s" || event.key === "S") {
         setLeft(prev => {
           if (prev > 0) {
-            playDecrementSound(); // Play sound immediately
+            playDecrementSound();
             return prev - 1;
           }
           return prev;
@@ -172,7 +188,7 @@ function App() {
       if (event.key === "ArrowLeft") {
         setRight(prev => {
           if (prev > 0) {
-            playDecrementSound(); // Play sound immediately
+            playDecrementSound();
             return prev - 1;
           }
           return prev;
@@ -182,9 +198,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [roundActive, audioLoaded]);
-
-
+  }, [roundActive, audioLoaded, isMobile]);
 
   // Determine winner at game end
   const getWinner = () => {
@@ -222,8 +236,6 @@ function App() {
     );
   });
 
-
-
   return (
     <div className="wrapper">
       <div className="top-bar">
@@ -250,20 +262,20 @@ function App() {
       
       {!started && !roundEnded && (
         <div className="welcome">
-          <h2>Press "A" or "→" to count the boxes!</h2>
-          <h3>Press "S" or "←" to decrement the count!</h3>
+          <h2>{isMobile ? 'Tap the buttons to count!' : 'Press "A" or "→" to count the boxes!'}</h2>
+          {!isMobile && <h3>Press "S" or "←" to decrement the count!</h3>}
         </div>
       )}
 
       {roundEnded && (
         <div className="final-results">
-          <h1 style={{ fontSize: '3rem', margin: '20px' }}>
+          <h1 style={{ fontSize: isMobile ? '2rem' : '3rem', margin: '20px' }}>
             {getWinner().emoji} Game Over! {getWinner().emoji}
           </h1>
-          <h2 style={{ fontSize: '2.5rem', color: getWinner().color }}>
+          <h2 style={{ fontSize: isMobile ? '1.5rem' : '2.5rem', color: getWinner().color }}>
             {getWinner().winner}
           </h2>
-          <div style={{ fontSize: '2rem', margin: '30px 0' }}>
+          <div style={{ fontSize: isMobile ? '1.2rem' : '2rem', margin: '30px 0' }}>
             <p style={{ color: '#4a90e2' }}>Left Player: {finalScores.left} points</p>
             <p style={{ color: '#e74c3c' }}>Right Player: {finalScores.right} points</p>
           </div>
@@ -278,19 +290,105 @@ function App() {
       )}
 
       {!roundEnded && (
-        <div className="middle">
+        <div className={isMobile ? "middle-mobile" : "middle"}>
           <div className="LHand">
             <p className="counter">{leftCount}</p>
-            <div style={{width: '100px', height: '100px', background: '#4a90e2', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', color: 'white', fontWeight: 'bold'}}>Left</div>
-            <h3>Press "A"</h3>
+            <div style={{
+              width: isMobile ? '80px' : '100px', 
+              height: isMobile ? '80px' : '100px', 
+              background: '#4a90e2', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              borderRadius: '10px', 
+              color: 'white', 
+              fontWeight: 'bold',
+              fontSize: isMobile ? '14px' : '16px'
+            }}>
+              Left
+            </div>
+            {isMobile ? (
+              <button 
+                className="count-button left-button"
+                onClick={handleLeftIncrement}
+                disabled={!roundActive}
+                style={{
+                  marginTop: '15px',
+                  padding: '15px 30px',
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  backgroundColor: roundActive ? '#4a90e2' : '#ccc',
+                  color: 'white',
+                  border: '3px solid #2e5c8a',
+                  borderRadius: '12px',
+                  cursor: roundActive ? 'pointer' : 'not-allowed',
+                  transition: 'transform 0.1s ease',
+                  touchAction: 'manipulation',
+                  userSelect: 'none'
+                }}
+                onTouchStart={(e) => {
+                  if (roundActive) e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                TAP +
+              </button>
+            ) : (
+              <h3>Press "A"</h3>
+            )}
           </div>
 
           <div className="grid-container">{cells}</div>
 
           <div className="RHand">
             <p className="counter">{rightCount}</p>
-            <div style={{width: '100px', height: '100px', background: '#e74c3c', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', color: 'white', fontWeight: 'bold'}}>Right</div>
-            <h3>Press →</h3>
+            <div style={{
+              width: isMobile ? '80px' : '100px', 
+              height: isMobile ? '80px' : '100px', 
+              background: '#e74c3c', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              borderRadius: '10px', 
+              color: 'white', 
+              fontWeight: 'bold',
+              fontSize: isMobile ? '14px' : '16px'
+            }}>
+              Right
+            </div>
+            {isMobile ? (
+              <button 
+                className="count-button right-button"
+                onClick={handleRightIncrement}
+                disabled={!roundActive}
+                style={{
+                  marginTop: '15px',
+                  padding: '15px 30px',
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  backgroundColor: roundActive ? '#e74c3c' : '#ccc',
+                  color: 'white',
+                  border: '3px solid #a93226',
+                  borderRadius: '12px',
+                  cursor: roundActive ? 'pointer' : 'not-allowed',
+                  transition: 'transform 0.1s ease',
+                  touchAction: 'manipulation',
+                  userSelect: 'none'
+                }}
+                onTouchStart={(e) => {
+                  if (roundActive) e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                TAP +
+              </button>
+            ) : (
+              <h3>Press →</h3>
+            )}
           </div>
         </div>
       )}
